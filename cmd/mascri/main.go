@@ -46,8 +46,14 @@ func main() {
 				Value: "/var/lib/cni", // CNI 插件需要在这个目录里记录哪些 IP 已经被分配给谁了，防止 IP 冲突。
 				Usage: "Path to CNI cache directory",
 			},
+			&cli.StringFlag{
+				Name:  "runtime-mode",
+				Value: "docker", // Options: "docker", "native"
+				Usage: "Container runtime backend to use",
+			},
 		},
 		
+		// 应用程序的主逻辑入口
 		// 应用程序的主逻辑入口
 		Action: func(c *cli.Context) error {
 			// 1. 初始化日志配置
@@ -69,7 +75,13 @@ func main() {
 			cniBinDir := c.String("cni-bin-dir")
 			cniConfDir := c.String("cni-conf-dir")
 			cniCacheDir := c.String("cni-cache-dir")
-			srv := server.NewMasCRIServer(socketPath, cniConfDir, []string{cniBinDir}, cniCacheDir)
+			srv := server.NewMasCRIServer(
+				socketPath, 
+				cniConfDir, 
+				[]string{cniBinDir}, 
+				cniCacheDir,
+				c.String("runtime-mode"),
+			)
 			
 			// Start() 是一个阻塞操作，直到程序退出或出错
 			if err := srv.Start(); err != nil {

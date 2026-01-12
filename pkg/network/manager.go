@@ -12,10 +12,31 @@ import (
 )
 
 // CNIManager manages the CNI plugins and network configuration
+// CNIManager manages the CNI plugins and network configuration
+// CNIManager 负责管理 CNI 插件交互和网络配置加载。
+// 它封装了底层 libcni 库的复杂性，提供给 Runtime 一个简单的 SetUp/TearDown 接口。
 type CNIManager struct {
-	cniConfig     libcni.CNIConfig
-	netConfigDir  string
-	binDirs       []string
+	// libcni 提供的核心配置对象，所有的插件执行（exec）都由它发起。
+	// 它知道插件在哪里 (Path)，缓存怎么记 (CacheDir)。
+	// libcni.CNIConfig 是 CNI 官方库 (github.com/containernetworking/cni/libcni) 提供的核心接口。
+	// 它的地位相当于 libcontainer.Factory：
+	// - libcontainer 负责调用 Kernel 创建容器。
+	// - libcni 负责调用 CNI 插件（二进制文件）配置网络。
+	// 
+	// 它的工作流程：
+	// 1. 读取 CNI 配置文件（如 10-bridge.conf）。
+	// 2. 找到对应的插件二进制（如 /opt/cni/bin/bridge）。
+	// 3. 设置好环境变量（CNI_COMMAND=ADD, CNI_NETNS=/proc/...）。
+	// 4. fork/exec 执行该插件，并把结果（IP 地址等）返回给我们。
+	cniConfig libcni.CNIConfig
+
+	// 配置文件目录路径 (e.g. /etc/cni/net.d)。
+	// 我们需要扫描这个目录来找到用户定义的网络配置列表。
+	netConfigDir string
+
+	// 插件二进制文件的搜索路径列表 (e.g. [/opt/cni/bin])。
+	// 当我们解析配置发现需要 "bridge" 插件时，就会去这些目录里找名为 "bridge" 的可执行文件。
+	binDirs []string
 }
 
 // NewCNIManager creates a new CNIManager

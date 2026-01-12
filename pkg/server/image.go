@@ -14,7 +14,7 @@ func (s *MasCRIServer) PullImage(ctx context.Context, req *runtimeapi.PullImageR
 	// 如果没有指定 tag，CRI 可能会传 "nginx" 而不是 "nginx:latest"，
 	// 但 docker pull 默认处理 "nginx" 为 "nginx:latest"，所以直接透传通常没问题。
 	
-	if err := s.docker.PullImage(imageName); err != nil {
+	if _, err := s.backend.PullImage(ctx, imageName); err != nil {
 		return nil, err
 	}
 
@@ -27,7 +27,7 @@ func (s *MasCRIServer) PullImage(ctx context.Context, req *runtimeapi.PullImageR
 // 目前只是为了满足接口，不一定会返回完整列表（因为 Adapter 没实现完整解析）
 func (s *MasCRIServer) ListImages(ctx context.Context, req *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
 	// Adapter 里这个方法是个空的，但我们调用一下，表示逻辑通了
-	_, err := s.docker.ListImages()
+	_, err := s.backend.ListImages()
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (s *MasCRIServer) ImageStatus(ctx context.Context, req *runtimeapi.ImageSta
 	}
 
 	// 尝试 inspect，如果报错说明镜像不存在
-	if err := s.docker.InspectImage(imageName); err == nil {
+	if err := s.backend.InspectImage(imageName); err == nil {
 		// 存在
 		// 严格来说这里应该解析 inspect 输出来填 Size 等字段
 		// 但为了 MVP，我们只告诉 Kubelet “有” 就行了

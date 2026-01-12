@@ -10,6 +10,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"mascri/pkg/docker"
+	"mascri/pkg/native"
 	"mascri/pkg/network"
 )
 
@@ -21,21 +22,57 @@ type MasCRIServer struct {
 	runtimeapi.UnimplementedImageServiceServer
 
 	socketPath string
-	docker     *docker.DockerAdapter
+	backend    RuntimeBackend // Replaced specific docker adapter with interface
 	cni        *network.CNIManager
 }
 
 // NewMasCRIServer 创建一个新的服务器实例
-func NewMasCRIServer(socketPath string, cniConfigDir string, cniBinDirs []string, cniCacheDir string) *MasCRIServer {
-	// Initialize CNI Manager
+// socketPath:   gRPC 监听的 Unix Socket 路径 (e.g. /tmp/mascri.sock)
+// cniConfigDir: CNI 插件的配置文件目录 (e.g. /etc/cni/net.d)
+// cniBinDirs:   CNI 插件的可执行文件目录列表 (e.g. /opt/cni/bin)
+// cniCacheDir:  CNI 插件的缓存目录 (e.g. /var/lib/cni)
+// runtimeMode:  运行时模式，"native" 或 "docker"
+func NewMasCRIServer(socketPath string, cniConfigDir string, cniBinDirs []string, cniCacheDir string, runtimeMode string) *MasCRIServer {
+	// 1. 初始化 CNI 管理器 (Networking)
+	// CNI 是 Kubernetes 的标准网络接口。我们需要它来给 Pod 分配 IP。
+	// 这里通过 network 包加载配置，准备好随时被 Runtime 调用。
 	cniMgr, err := network.NewCNIManager(cniConfigDir, cniBinDirs, cniCacheDir)
 	if err != nil {
+		// 如果 CNI 初始化失败，我们只打印警告，不强制退出。
+		// 这样至少还可以运行 HostNetwork 的 Pod 或者仅用于非网络测试。
 		logrus.Warnf("Failed to initialize CNI manager: %v. Networking will not work.", err)
 	}
 
+	var backend RuntimeBackend
+	var initErr error
+
+	// 2. 选择并初始化运行时后端 (Runtime Backend)
+	// 策略模式：根据用户传参决定 MasCRI 的“心脏”是谁。
+	switch runtimeMode {
+	case "native":
+		// Native 模式：直接基于 libcontainer (runc) 操作内核。
+		// 这是我们自己实现的“简易版 Docker”。
+		// 我们将 cniMgr 注入进去，让 NativeAdapter 有能力配置网络。
+		logrus.Info("Initializing NATIVE runtime backend (libcontainer)...")
+		// /var/lib/mascri 是默认的容器数据存储根目录
+		backend, initErr = native.NewNativeAdapter("/var/lib/mascri", cniMgr)
+	default: // "docker"
+		// Docker 模式：作为 Docker Daemon 的代理。
+		// 这种模式下，网络由 Docker 自己管理（bridge network），所以不需要传 cniMgr。
+		logrus.Info("Initializing DOCKER runtime backend...")
+		backend = docker.NewAdapter()
+	}
+
+	if initErr != nil {
+		// 如果心脏启动失败（比如 native 模式下无法创建目录），直接 Fatal 退出。
+		logrus.Fatalf("Failed to initialize backend %s: %v", runtimeMode, initErr)
+	}
+
+	// 3. 返回构造好的 Server 对象
+	// 这个对象随后会被注册到 gRPC Server 中。
 	return &MasCRIServer{
 		socketPath: socketPath,
-		docker:     docker.NewAdapter(),
+		backend:    backend,
 		cni:        cniMgr,
 	}
 }
