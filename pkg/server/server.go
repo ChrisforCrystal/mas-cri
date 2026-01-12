@@ -10,6 +10,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"mascri/pkg/docker"
+	"mascri/pkg/network"
 )
 
 // MasCRIServer 是我们 CRI 的核心服务结构体。
@@ -21,13 +22,21 @@ type MasCRIServer struct {
 
 	socketPath string
 	docker     *docker.DockerAdapter
+	cni        *network.CNIManager
 }
 
 // NewMasCRIServer 创建一个新的服务器实例
-func NewMasCRIServer(socketPath string) *MasCRIServer {
+func NewMasCRIServer(socketPath string, cniConfigDir string, cniBinDirs []string, cniCacheDir string) *MasCRIServer {
+	// Initialize CNI Manager
+	cniMgr, err := network.NewCNIManager(cniConfigDir, cniBinDirs, cniCacheDir)
+	if err != nil {
+		logrus.Warnf("Failed to initialize CNI manager: %v. Networking will not work.", err)
+	}
+
 	return &MasCRIServer{
 		socketPath: socketPath,
 		docker:     docker.NewAdapter(),
+		cni:        cniMgr,
 	}
 }
 

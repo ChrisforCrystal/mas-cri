@@ -31,6 +31,21 @@ func main() {
 				Aliases: []string{"d"},    // 别名 -d
 				Usage:   "Enable debug logging", // 开启后会打印更多细节
 			},
+			&cli.StringFlag{
+				Name:  "cni-bin-dir",
+				Value: "/opt/cni/bin",// 这里面存放着各种编译好的 CNI 插件二进制文件，比如 bridge（造桥）、loopback（回环）、host-local（分配 IP）等。
+				Usage: "Path to CNI plugin binaries",
+			},
+			&cli.StringFlag{
+				Name:  "cni-conf-dir",
+				Value: "/etc/cni/net.d", // 这里存放 CNI 的配置文件（通常是 .conf 或 .conflist 结尾的 JSON）。
+				Usage: "Path to CNI configuration files",
+			},
+			&cli.StringFlag{
+				Name:  "cni-cache-dir",
+				Value: "/var/lib/cni", // CNI 插件需要在这个目录里记录哪些 IP 已经被分配给谁了，防止 IP 冲突。
+				Usage: "Path to CNI cache directory",
+			},
 		},
 		
 		// 应用程序的主逻辑入口
@@ -51,7 +66,10 @@ func main() {
 			
 			// 3. 创建并启动 MasCRI 服务器
 			// 这一步会初始化 gRPC 服务，并开始监听 Unix Socket
-			srv := server.NewMasCRIServer(socketPath)
+			cniBinDir := c.String("cni-bin-dir")
+			cniConfDir := c.String("cni-conf-dir")
+			cniCacheDir := c.String("cni-cache-dir")
+			srv := server.NewMasCRIServer(socketPath, cniConfDir, []string{cniBinDir}, cniCacheDir)
 			
 			// Start() 是一个阻塞操作，直到程序退出或出错
 			if err := srv.Start(); err != nil {

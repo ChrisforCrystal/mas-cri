@@ -57,10 +57,11 @@ INFO --> [gRPC Request] method=/runtime.v1.RuntimeService/RunPodSandbox body="{\
 
 ## 路线图
 
-- [x] **Phase 1**: 基础框架与 gRPC 日志拦截
-- [x] **Phase 2**: 对接 Docker 后端 (Real Container Implementation) (Current)
-- [ ] **Phase 3**: 进阶容器网络与 CNI 探索
-- [ ] **Phase 4**: 探索安全容器 (gVisor/Kata)
+- [x] **001 Basic CRI Foundation**: gRPC Server, Traceability, Version RPC
+- [x] **002 Docker Backend**: Pull Images, Run/Start Containers via Docker CLI
+- [x] **003 CNI Networking**: Integrate `libcni` for Pod IP management
+- [ ] **004 Streaming IO**: `kubectl logs`, `exec`, `attach`
+- [ ] **005 Pod Lifecycle**: Metadata handling, recovery)
 
 ## License
 

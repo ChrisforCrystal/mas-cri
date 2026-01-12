@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -154,6 +155,31 @@ func (d *DockerAdapter) StartContainer(containerID string) error {
 	return nil
 }
 
+// StopContainer 停止容器
+// 对应: docker stop <container_id>
+func (d *DockerAdapter) StopContainer(containerID string) error {
+	logrus.Infof("[Docker] Stopping Container: %s", containerID)
+	cmd := exec.Command("docker", "stop", containerID)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stop container: %s (%w)", string(out), err)
+	}
+	return nil
+}
+
+// RemoveContainer 删除容器
+// 对应: docker rm <container_id>
+// RemovePodSandbox 时需要强制删除(Force)吗？CRI 规范通常先 Stop 再 Remove。
+// 这里我们简单实现 docker rm -f (force) 以防万一
+func (d *DockerAdapter) RemoveContainer(containerID string) error {
+	logrus.Infof("[Docker] Removing Container: %s", containerID)
+	cmd := exec.Command("docker", "rm", "-f", containerID)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to remove container: %s (%w)", string(out), err)
+	}
+	return nil
+}
+
+
 // ListContainers 列出所有容器，用于实现 ListPodSandbox 和 ListContainers
 // 对应: docker ps -a --format '{{json .}}'
 func (d *DockerAdapter) ListContainers() ([]Container, error) {
@@ -177,4 +203,38 @@ func (d *DockerAdapter) ListContainers() ([]Container, error) {
 		containers = append(containers, c)
 	}
 	return containers, nil
+}
+
+// GetNetNS 获取容器的网络命名空间路径
+// 对应: docker inspect -f '{{.NetworkSettings.SandboxKey}}' <container_id>
+// 返回值类似: /var/run/docker/netns/xxxx
+func (d *DockerAdapter) GetNetNS(containerID string) (string, error) {
+	cmd := exec.Command("docker", "inspect", "-f", "{{.NetworkSettings.SandboxKey}}", containerID)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get netns: %s (%w)", string(out), err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// GetContainerCreatedAt 获取容器创建时间 (Unix Nano)
+func (d *DockerAdapter) GetContainerCreatedAt(containerID string) (int64, error) {
+	// docker inspect -f '{{.Created}}' returns RFC3339 format, e.g. "2023-10-27T10:00:00.123456789Z"
+	cmd := exec.Command("docker", "inspect", "-f", "{{.Created}}", containerID)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("failed to inspect created: %s (%w)", string(out), err)
+	}
+	
+	tsStr := strings.TrimSpace(string(out))
+	t, err := time.Parse(time.RFC3339Nano, tsStr)
+	if err != nil {
+		// Try without Nano if failed
+		t, err = time.Parse(time.RFC3339, tsStr)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse time %s: %w", tsStr, err)
+		}
+	}
+	
+	return t.UnixNano(), nil
 }
