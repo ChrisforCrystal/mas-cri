@@ -13,12 +13,12 @@
 
 ## 当前状态 (v0.1.0)
 
-目前处于 **Feature 001: Foundation** 阶段。
+目前处于 **Feature 002: Docker Backend** 完成阶段。
 
 - [x] **Setup**: Go 1.22 项目结构。
 - [x] **gRPC Server**: 监听 Unix Socket (`/tmp/mascri.sock`)。
 - [x] **Trace Interceptor**: 自动捕获并打印所有请求的 JSON 参数。
-- [x] **Mock Backend**: 实现了 `Version` 和 `Status`，以及 Mock 版的 `RunPodSandbox`。
+- [x] **Docker Backend**: 真正的容器运行时，支持 Pull, RunP, Create, Start, List。
 
 ## 快速开始
 
@@ -57,8 +57,8 @@ INFO --> [gRPC Request] method=/runtime.v1.RuntimeService/RunPodSandbox body="{\
 
 ## 路线图
 
-- [x] **Phase 1**: 基础框架与 gRPC 日志拦截 (Current)
-- [ ] **Phase 2**: 对接 Docker 后端 (Real Container Implementation)
+- [x] **Phase 1**: 基础框架与 gRPC 日志拦截
+- [x] **Phase 2**: 对接 Docker 后端 (Real Container Implementation) (Current)
 - [ ] **Phase 3**: 进阶容器网络与 CNI 探索
 - [ ] **Phase 4**: 探索安全容器 (gVisor/Kata)
 

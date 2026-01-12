@@ -8,6 +8,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"mascri/pkg/docker"
 )
 
 // MasCRIServer 是我们 CRI 的核心服务结构体。
@@ -18,12 +20,14 @@ type MasCRIServer struct {
 	runtimeapi.UnimplementedImageServiceServer
 
 	socketPath string
+	docker     *docker.DockerAdapter
 }
 
 // NewMasCRIServer 创建一个新的服务器实例
 func NewMasCRIServer(socketPath string) *MasCRIServer {
 	return &MasCRIServer{
 		socketPath: socketPath,
+		docker:     docker.NewAdapter(),
 	}
 }
 
